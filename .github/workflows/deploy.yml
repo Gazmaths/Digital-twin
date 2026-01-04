@@ -26,6 +26,7 @@ jobs:
     env:
       ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
       AWS_REGION: us-east-2
+      DEFAULT_AWS_REGION: us-east-2
       AWS_ACCOUNT_ID: "140116240845"
       # Use ARN directly to avoid the "Source Account ID is needed" error.
       AWS_ROLE_ARN: arn:aws:iam::140116240845:role/github-actions-twin-deploy

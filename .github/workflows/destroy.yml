@@ -4,12 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment to destroy"
+        description: 'Environment to destroy'
         required: true
         type: choice
-        options: [dev, test, prod]
+        options:
+          - dev
+          - test
+          - prod
       confirm:
-        description: "Type the environment name to confirm destruction"
+        description: 'Type the environment name to confirm destruction'
         required: true
 
 permissions:
@@ -21,16 +24,9 @@ jobs:
     name: Destroy ${{ github.event.inputs.environment }}
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
-
-    env:
-      ENVIRONMENT: ${{ github.event.inputs.environment }}
-      AWS_REGION: us-east-2
-      AWS_ACCOUNT_ID: "140116240845"
-      AWS_ROLE_ARN: arn:aws:iam::140116240845:role/github-actions-twin-deploy
-
+    
     steps:
       - name: Verify confirmation
-        shell: bash
         run: |
           if [ "${{ github.event.inputs.confirm }}" != "${{ github.event.inputs.environment }}" ]; then
             echo "❌ Confirmation does not match environment name!"
@@ -43,40 +39,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: github-actions-destroy
-          aws-region: ${{ env.AWS_REGION }}
-          audience: sts.amazonaws.com
+          aws-region: ${{ secrets.DEFAULT_AWS_REGION }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_wrapper: false
-
-      # Optional but helpful for scripts that rely on these vars:
-      - name: Export env vars for scripts
-        shell: bash
-        run: |
-          echo "AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}" >> $GITHUB_ENV
-          echo "DEFAULT_AWS_REGION=${AWS_REGION}" >> $GITHUB_ENV
+          terraform_wrapper: false  # Important: disable wrapper to get raw outputs
 
       - name: Run Destroy Script
-        shell: bash
         run: |
+          # Set environment variables for the script
+          export AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+          export DEFAULT_AWS_REGION=${{ secrets.DEFAULT_AWS_REGION }}
+          
+          # Make script executable and run it
           chmod +x scripts/destroy.sh
-          ./scripts/destroy.sh "$ENVIRONMENT"
-
-      # Safety: verify terraform sees the workspace and nothing remains (optional)
-      # - name: Verify Terraform state (optional)
-      #   working-directory: ./terraform
-      #   shell: bash
-      #   run: |
-      #     terraform init -input=false
-      #     terraform workspace select "$ENVIRONMENT" || true
-      #     terraform state list || true
+          ./scripts/destroy.sh ${{ github.event.inputs.environment }}
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
 
       - name: Destruction Complete
         run: |

@@ -22,20 +22,18 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'dev' }}
 
-    # Keep these consistent everywhere
     env:
       ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
       AWS_REGION: us-east-2
       DEFAULT_AWS_REGION: us-east-2
       AWS_ACCOUNT_ID: "140116240845"
-      # Use ARN directly to avoid the "Source Account ID is needed" error.
       AWS_ROLE_ARN: arn:aws:iam::140116240845:role/github-actions-twin-deploy
+      PROJECT_NAME: twin
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # OIDC auth into AWS
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -43,6 +41,15 @@ jobs:
           role-session-name: github-actions-deploy
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Check backend bucket + lock table
+        run: |
+          aws s3api head-bucket --bucket twin-terraform-state-140116240845
+          aws dynamodb describe-table --table-name twin-terraform-locks --region us-east-2 >/dev/null
+          echo "✅ Backend bucket + lock table OK"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -66,29 +73,23 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # Run your deploy script (expects env arg)
       - name: Run Deployment Script
         run: |
           chmod +x scripts/deploy.sh
-          ./scripts/deploy.sh "$ENVIRONMENT"
+          ./scripts/deploy.sh "$ENVIRONMENT" "$PROJECT_NAME"
 
-      # Ensure Terraform is initialized and read outputs reliably
+      # Read outputs using the already-initialized backend/state
       - name: Get Deployment Outputs
         id: tf
         working-directory: ./terraform
         run: |
-          terraform init -input=false
           terraform workspace select "$ENVIRONMENT" || terraform workspace new "$ENVIRONMENT"
-
           echo "cloudfront_url=$(terraform output -raw cloudfront_url)" >> "$GITHUB_OUTPUT"
           echo "api_url=$(terraform output -raw api_gateway_url)" >> "$GITHUB_OUTPUT"
           echo "frontend_bucket=$(terraform output -raw s3_frontend_bucket)" >> "$GITHUB_OUTPUT"
-
-          # OPTIONAL (recommended): add this output in terraform and uncomment:
+          # optional if you add it in terraform:
           # echo "cloudfront_distribution_id=$(terraform output -raw cloudfront_distribution_id)" >> "$GITHUB_OUTPUT"
 
-      # Recommended approach: invalidate by distribution ID (best)
-      # If you DON'T have distribution id output yet, this step will just skip.
       - name: Invalidate CloudFront (by distribution id if available)
         run: |
           if [ -n "${{ steps.tf.outputs.cloudfront_distribution_id }}" ]; then
@@ -97,7 +98,6 @@ jobs:
               --paths "/*"
           else
             echo "No cloudfront_distribution_id output found. Skipping invalidation."
-            echo "Tip: output cloudfront_distribution_id from Terraform for reliable invalidation."
           fi
 
       - name: Deployment Summary

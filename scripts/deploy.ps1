@@ -1,7 +1,7 @@
 param(
-  [ValidateSet("dev","test","prod")]
+  [ValidateSet("dev","test")]
   [string]$Environment = "dev",
-  [string]$ProjectName = "twin"
+  [string]$ProjectName = "digital-twin"
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,9 +34,9 @@ $awsRegion =
   elseif ($env:DEFAULT_AWS_REGION) { $env:DEFAULT_AWS_REGION }
   else { "us-east-2" }
 
-$stateBucket = "twin-terraform-state-$awsAccountId"
-$lockTable   = "twin-terraform-locks"
-$stateKey    = "twin/$Environment/terraform.tfstate"
+$stateBucket = "digital-twin-terraform-state-$awsAccountId"
+$lockTable   = "digital-twin-terraform-locks"
+$stateKey    = "digital-twin/$Environment/terraform.tfstate"
 
 Write-Host "AWS Account: $awsAccountId | Region: $awsRegion" -ForegroundColor DarkGray
 Write-Host "Terraform backend: s3://$stateBucket/$stateKey" -ForegroundColor DarkGray
@@ -67,16 +67,9 @@ if ($workspaces -notmatch "(\s|^)\*?\s*$Environment(\s|$)") {
 }
 terraform workspace select $Environment | Out-Null
 
-if ($Environment -eq "prod") {
-  terraform apply -auto-approve `
-    -var-file="prod.tfvars" `
-    -var="project_name=$ProjectName" `
-    -var="environment=$Environment"
-} else {
-  terraform apply -auto-approve `
-    -var="project_name=$ProjectName" `
-    -var="environment=$Environment"
-}
+terraform apply -auto-approve `
+  -var="project_name=$ProjectName" `
+  -var="environment=$Environment"
 
 # Outputs
 $ApiUrl         = (terraform output -raw api_gateway_url).Trim()

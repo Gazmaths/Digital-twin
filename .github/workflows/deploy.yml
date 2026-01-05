@@ -10,7 +10,7 @@ on:
         required: true
         default: dev
         type: choice
-        options: [dev, test, prod]
+        options: [dev, test]
 
 permissions:
   id-token: write
@@ -29,7 +29,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::140116240845:role/github-actions-twin-deploy
+          role-to-assume: arn:aws:iam::140116240845:role/github-actions-digital-twin-deploy
           role-session-name: github-actions-deploy
           aws-region: us-east-2
 

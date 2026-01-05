@@ -10,7 +10,6 @@ on:
         options:
           - dev
           - test
-          - prod
       confirm:
         description: 'Type the environment name to confirm destruction'
         required: true

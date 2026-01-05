@@ -6,12 +6,12 @@ if [ $# -eq 0 ]; then
     echo "❌ Error: Environment parameter is required"
     echo "Usage: $0 <environment>"
     echo "Example: $0 dev"
-    echo "Available environments: dev, test, prod"
+    echo "Available environments: dev, test"
     exit 1
 fi
 
 ENVIRONMENT=$1
-PROJECT_NAME=${2:-twin}
+PROJECT_NAME=${2:-digital-twin}
 
 echo "🗑️ Preparing to destroy ${PROJECT_NAME}-${ENVIRONMENT} infrastructure..."
 
@@ -25,10 +25,10 @@ AWS_REGION=${DEFAULT_AWS_REGION:-us-east-2}
 # Initialize terraform with S3 backend
 echo "🔧 Initializing Terraform with S3 backend..."
 terraform init -input=false \
-  -backend-config="bucket=twin-terraform-state-${AWS_ACCOUNT_ID}" \
+  -backend-config="bucket=digital-twin-terraform-state-${AWS_ACCOUNT_ID}" \
   -backend-config="key=${ENVIRONMENT}/terraform.tfstate" \
   -backend-config="region=${AWS_REGION}" \
-  -backend-config="dynamodb_table=twin-terraform-locks" \
+  -backend-config="dynamodb_table=digital-twin-terraform-locks" \
   -backend-config="encrypt=true"
 
 # Check if workspace exists
@@ -72,12 +72,7 @@ if [ ! -f "../backend/lambda-deployment.zip" ]; then
     echo "dummy" | zip ../backend/lambda-deployment.zip -
 fi
 
-# Run terraform destroy with auto-approve
-if [ "$ENVIRONMENT" = "prod" ] && [ -f "prod.tfvars" ]; then
-    terraform destroy -var-file=prod.tfvars -var="project_name=$PROJECT_NAME" -var="environment=$ENVIRONMENT" -auto-approve
-else
-    terraform destroy -var="project_name=$PROJECT_NAME" -var="environment=$ENVIRONMENT" -auto-approve
-fi
+terraform destroy -var="project_name=$PROJECT_NAME" -var="environment=$ENVIRONMENT" -auto-approve
 
 echo "✅ Infrastructure for ${ENVIRONMENT} has been destroyed!"
 echo ""

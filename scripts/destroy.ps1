@@ -1,13 +1,13 @@
 param(
     [Parameter(Mandatory=$true)]
     [string]$Environment,
-    [string]$ProjectName = "twin"
+    [string]$ProjectName = "digital-twin"
 )
 
 # Validate environment parameter
-if ($Environment -notmatch '^(dev|test|prod)$') {
+if ($Environment -notmatch '^(dev|test)$') {
     Write-Host "Error: Invalid environment '$Environment'" -ForegroundColor Red
-    Write-Host "Available environments: dev, test, prod" -ForegroundColor Yellow
+    Write-Host "Available environments: dev, test" -ForegroundColor Yellow
     exit 1
 }
 
@@ -23,10 +23,10 @@ $awsRegion = if ($env:DEFAULT_AWS_REGION) { $env:DEFAULT_AWS_REGION } else { "us
 # Initialize terraform with S3 backend
 Write-Host "Initializing Terraform with S3 backend..." -ForegroundColor Yellow
 terraform init -input=false `
-  -backend-config="bucket=twin-terraform-state-$awsAccountId" `
+  -backend-config="bucket=digital-twin-terraform-state-$awsAccountId" `
   -backend-config="key=$Environment/terraform.tfstate" `
   -backend-config="region=$awsRegion" `
-  -backend-config="dynamodb_table=twin-terraform-locks" `
+  -backend-config="dynamodb_table=digital-twin-terraform-locks" `
   -backend-config="encrypt=true"
 
 # Check if workspace exists
@@ -67,17 +67,9 @@ try {
 
 Write-Host "Running terraform destroy..." -ForegroundColor Yellow
 
-# Run terraform destroy with auto-approve
-if ($Environment -eq "prod" -and (Test-Path "prod.tfvars")) {
-    terraform destroy -var-file=prod.tfvars `
-                     -var="project_name=$ProjectName" `
+terraform destroy -var="project_name=$ProjectName" `
                      -var="environment=$Environment" `
                      -auto-approve
-} else {
-    terraform destroy -var="project_name=$ProjectName" `
-                     -var="environment=$Environment" `
-                     -auto-approve
-}
 
 Write-Host "Infrastructure for $Environment has been destroyed!" -ForegroundColor Green
 Write-Host ""
